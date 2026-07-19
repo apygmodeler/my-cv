@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="A monotone CV and interactive computer graphics page." />
+  <title>Attapinya R. | CV</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <a class="logo" href="#">
+      <img src="images/logo.png" alt="Logo">
+    </a>
+
+    <button class="menu-button" id="menuButton" aria-label="Open navigation">
+      ☰
+    </button>
+
+    <nav id="navigation">
+      <a href="#about">About</a>
+      <a href="#skills">Skills</a>
+      <a href="#experience">Experience</a>
+      <a href="#contact">Contact</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero section" id="home">
+      <div class="hero-copy">
+        <p class="eyebrow">COMPUTER SCIENCE STUDENT</p>
+        <h1>Attapinya R.</h1>
+        <p class="hero-text">
+          I enjoy creating practical software and 3d models that are simple, useful, and easy to use.
+        </p>
+        <div class="hero-actions">
+          <a class="button button-dark" href="#contact">Contact Me</a>
+          <a class="button button-light" href="#graphics">Try the Demo</a>
+        </div>
+      </div>
+
+      <aside class="profile-card">
+        <div class="avatar">
+            <img src="images/logo.png" alt="Profile">
+        </div>
+        <p class="status"><span></span> Available for opportunities</p>
+        <dl>
+          <div><dt>Email</dt><dd>apyg.modeler@gmail.com</dd></div>
+          <div><dt>GitHub</dt><dd>github.com/apygmodeler</dd></div>
+          <div><dt>Sketchfab</dt><dd>sketchfab.com/APYG/models</dd></div>
+        </dl>
+      </aside>
+    </section>
+
+    <section class="section two-column" id="about">
+      <div>
+        <h2>About Me</h2>
+      </div>
+      <div class="section-content">
+        <p>
+          I am a Computer Science student interested in programming and 3d models.
+          I like learning by building real projects and improving them from feedback.
+        </p>
+        <p>
+          My goal is to create software that balances good design,
+          clear structure, and reliable functionality.
+        </p>
+      </div>
+    </section>
+
+    <section class="section two-column" id="skills">
+      <div>
+        <h2>Skills</h2>
+      </div>
+      <div class="skill-grid">
+
+        <a class="skill-card" href="https://github.com/apygmodeler" target="_blank">
+          <img src="images/github.png" alt="GitHub">
+          <div class="skill-overlay"></div>
+
+          <div class="skill-content">
+            <span>Development</span>
+            <h3>GitHub</h3>
+            <p>View my coding projects</p>
+          </div>
+        </a>
+
+        <a class="skill-card" href="https://sketchfab.com/APYG/models" target="_blank">
+          <img src="images/sketchfab.png" alt="3D Model Portfolio">
+          <div class="skill-overlay"></div>
+
+          <div class="skill-content">
+            <span>Portfolio</span>
+            <h3>3D Models</h3>
+            <p>Explore my model work</p>
+          </div>
+        </a>
+
+        <a class="skill-card" href="https://mcmodels.net/vendors/300/suelaewruay" target="_blank">
+          <img src="images/mcmodel.png" alt="MCModels Store">
+          <div class="skill-overlay"></div>
+
+          <div class="skill-content">
+            <span>Marketplace</span>
+            <h3>MCModels</h3>
+            <p>Visit my product store</p>
+          </div>
+        </a>
+
+      </div>
+    </section>
+
+    <section class="section" id="experience">
+      <div class="section-heading">
+        <div>
+          <h2>Experience & Education</h2>
+        </div>
+      </div>
+      
+      <div class="timeline">
+
+        <article class="timeline-item">
+          <span class="timeline-date">2019 — Present</span>
+          <div>
+            <h3>Freelance 3D Modeler</h3>
+            <p class="muted">Blockbench, Blender</p>
+            <p>
+              Create custom Minecraft models, textures, decorations,
+              cosmetics, and game-ready assets for clients.
+            </p>
+          </div>
+        </article>
+        
+        <article class="timeline-item">
+          <span class="timeline-date">2024 — Present</span>
+          <div>
+            <h3>Bachelor's Degree in Computer Science</h3>
+            <p class="muted">Kasetsart University</p>
+            <p>
+              Studying programming, software engineering, computer graphics,
+              networking, databases, and system analysis.
+            </p>
+          </div>
+        </article>
+      </div>
+
+      <div class="graphics-layout">
+        <div class="canvas-wrap" id="graphics" tabindex="0">
+          <canvas id="canvas" width="640" height="420">
+            Your browser does not support HTML canvas.
+          </canvas>
+          <p class="focus-note">Drag the sprite with your mouse. Keyboard controls also work.</p>
+        </div>
+
+        <aside class="controls-panel">
+          <h3>Keyboard Controls</h3>
+          <ul>
+            <li><kbd>Q 4 / E 6</kbd> — Rotate</li>
+            <li><kbd>+ / -</kbd> — Scale</li>
+            <li><kbd>R</kbd> — Reset</li>
+          </ul>
+
+          <div class="button-controls">
+            <div>
+              <button data-action="scale-down">−</button>
+              <button data-action="scale-up">＋</button>
+              <button data-action="rotate-left">↺</button>
+              <button data-action="rotate-right">↻</button>
+            </div>
+            <button class="reset-button" data-action="reset">Reset</button>
+          </div>
+
+          <div class="transform-data">
+            <p>X: <strong id="xValue">320</strong></p>
+            <p>Y: <strong id="yValue">210</strong></p>
+            <p>Rotation: <strong id="rotationValue">0°</strong></p>
+            <p>Scale: <strong id="scaleValue">1.00</strong></p>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section contact-section" id="contact">
+      <h2>Let’s Connect</h2>
+      <p>
+        I am open to internships, freelance work, and opportunities
+        to collaborate on useful and creative projects.
+      </p>
+      <a class="button button-dark" href="mailto:apyg.modeler@gmail.com">
+        apyg.modeler@gmail.com
+      </a>
+    </section>
+  </main>
+
+  <footer>
+    <p>© <span id="currentYear"></span> APYG</p>
+    <p>Built with HTML, CSS, and JavaScript.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

@@ -70,14 +70,6 @@ nav a:hover {
   color: var(--gray);
 }
 
-.menu-button {
-  display: none;
-  border: 0;
-  background: none;
-  font-size: 1.4rem;
-  cursor: pointer;
-}
-
 .section {
   width: min(var(--max-width), calc(100% - 48px));
   margin: 0 auto;

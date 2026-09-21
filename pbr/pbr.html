@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Materials</title>
+    <link rel="stylesheet" href="pbr_styles.css">
+
+</head>
+
+<body>
+
+    <aside id="controlPanel">
+        <h1>PBR Controls</h1>
+        <div class="hint">
+            ปรับแสงด้วย GUI หรือกด <b>Shift + ลากเมาส์</b> บนฉากเพื่อย้ายแสงในแกน X/Z
+        </div>
+
+        <div class="section">
+            <div class="sectionTitle">Light Position</div>
+
+            <div class="row">
+                <div class="labelRow"><span>X</span><span class="value" id="lightXValue">10.0</span></div>
+                <input id="lightX" type="range" min="-15" max="15" step="0.1" value="10">
+            </div>
+
+            <div class="row">
+                <div class="labelRow"><span>Y</span><span class="value" id="lightYValue">10.0</span></div>
+                <input id="lightY" type="range" min="0.5" max="15" step="0.1" value="10">
+            </div>
+
+            <div class="row">
+                <div class="labelRow"><span>Z</span><span class="value" id="lightZValue">10.0</span></div>
+                <input id="lightZ" type="range" min="-15" max="15" step="0.1" value="10">
+            </div>
+
+            <div class="row">
+                <div class="labelRow"><span>Intensity</span><span class="value" id="lightIntensityValue">0.50</span></div>
+                <input id="lightIntensity" type="range" min="0" max="3" step="0.05" value="0.5">
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="sectionTitle">Skybox</div>
+            <button id="skyboxToggle">Skybox: ON</button>
+        </div>
+    </aside>
+    <div id="lightDot">Light: X 10.0 · Y 10.0 · Z 10.0</div>
+
+    <!-- core three.js -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/EXRLoader.js"></script>
+
+    <script>
+
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true; // Shadow
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        const scene = new THREE.Scene();
+
+        
+        const camera = new THREE.PerspectiveCamera(
+            75,
+            window.innerWidth / window.innerHeight,
+            0.1,
+            1000
+        );
+        camera.position.set(0, 2, 5);
+        camera.lookAt(0, 0, 0);
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+        const abmientLight = new THREE.AmbientLight(0x404040, 1); // soft white light
+        scene.add(abmientLight);
+
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        directionalLight.position.set(10, 10, 10);
+        directionalLight.castShadow = true;
+        scene.add(directionalLight);
+
+        // ตัวช่วยให้เห็นตำแหน่งของแหล่งกำเนิดแสง
+        const lightHelper = new THREE.Mesh(
+            new THREE.SphereGeometry(0.12, 16, 16),
+            new THREE.MeshBasicMaterial({ color: 0xffffff })
+        );
+        lightHelper.position.copy(directionalLight.position);
+        scene.add(lightHelper);
+
+
+        
+        const exrSkyboxUrl = 'https://dl.polyhaven.org/file/ph-assets/HDRIs/exr/4k/fireplace_4k.exr';
+        const pmremGenerator = new THREE.PMREMGenerator(renderer);
+        pmremGenerator.compileEquirectangularShader();
+
+        let skyboxTexture = null;
+        let skyboxEnabled = true;
+
+        new THREE.EXRLoader()
+            .setDataType(THREE.UnsignedByteType)
+            .load(exrSkyboxUrl, (texture) => {
+                skyboxTexture = pmremGenerator.fromEquirectangular(texture).texture;
+                scene.background = skyboxTexture;
+                scene.environment = skyboxTexture;
+
+                texture.dispose();
+                pmremGenerator.dispose();
+            }, undefined, (error) => {
+                console.error('Unable to load EXR skybox:', error);
+            });
+
+//ใส่พื้น
+        const texFloor = new THREE.TextureLoader().load('https://apygmodeler.github.io/my-cv/images/granite_tile_diff_1k.jpg', t => {
+        });
+        const matFloor = new THREE.MeshStandardMaterial({
+            map: texFloor
+        });
+        const planeGeometry = new THREE.PlaneGeometry(10, 10);
+        const plane = new THREE.Mesh(planeGeometry, matFloor);
+        plane.rotation.x = -Math.PI / 2; 
+        plane.receiveShadow = true;
+        
+        scene.add(plane);
+
+        const loader = new THREE.GLTFLoader();
+        loader.load('https://apygmodeler.github.io/my-cv/3dmodels/fnf.glb', (gltf) => {
+            const model = gltf.scene;
+
+            model.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+
+            model.position.set(0, 0, 0);
+            scene.add(model);
+        });
+        
+
+        // ---------- GUI + Mouse interaction ----------
+        const lightX = document.getElementById('lightX');
+        const lightY = document.getElementById('lightY');
+        const lightZ = document.getElementById('lightZ');
+        const lightIntensity = document.getElementById('lightIntensity');
+
+        const lightXValue = document.getElementById('lightXValue');
+        const lightYValue = document.getElementById('lightYValue');
+        const lightZValue = document.getElementById('lightZValue');
+        const lightIntensityValue = document.getElementById('lightIntensityValue');
+        const lightDot = document.getElementById('lightDot');
+
+        function updateLightFromGUI() {
+            directionalLight.position.set(
+                parseFloat(lightX.value),
+                parseFloat(lightY.value),
+                parseFloat(lightZ.value)
+            );
+            directionalLight.intensity = parseFloat(lightIntensity.value);
+            lightHelper.position.copy(directionalLight.position);
+
+            lightXValue.textContent = directionalLight.position.x.toFixed(1);
+            lightYValue.textContent = directionalLight.position.y.toFixed(1);
+            lightZValue.textContent = directionalLight.position.z.toFixed(1);
+            lightIntensityValue.textContent = directionalLight.intensity.toFixed(2);
+
+            lightDot.textContent =
+                `Light: X ${directionalLight.position.x.toFixed(1)} · ` +
+                `Y ${directionalLight.position.y.toFixed(1)} · ` +
+                `Z ${directionalLight.position.z.toFixed(1)}`;
+        }
+
+        [lightX, lightY, lightZ, lightIntensity].forEach((input) => {
+            input.addEventListener('input', updateLightFromGUI);
+        });
+
+
+        const skyboxToggle = document.getElementById('skyboxToggle');
+
+        skyboxToggle.addEventListener('click', () => {
+            skyboxEnabled = !skyboxEnabled;
+
+            if (skyboxEnabled) {
+                scene.background = skyboxTexture;
+                skyboxToggle.textContent = 'Skybox: ON';
+            } else {
+                scene.background = null;
+                skyboxToggle.textContent = 'Skybox: OFF';
+            }
+        });
+
+        // Mouse: Shift + drag บนฉาก เพื่อย้ายตำแหน่งแสงในระนาบ X/Z
+        let movingLightWithMouse = false;
+
+        renderer.domElement.addEventListener('pointerdown', (event) => {
+            if (!event.shiftKey) return;
+            movingLightWithMouse = true;
+            controls.enabled = false;
+            renderer.domElement.setPointerCapture(event.pointerId);
+        });
+
+        renderer.domElement.addEventListener('pointermove', (event) => {
+            if (!movingLightWithMouse) return;
+
+            const rect = renderer.domElement.getBoundingClientRect();
+            const nx = (event.clientX - rect.left) / rect.width;
+            const ny = (event.clientY - rect.top) / rect.height;
+
+            const x = (nx * 2 - 1) * 15;
+            const z = (ny * 2 - 1) * 15;
+
+            lightX.value = x.toFixed(1);
+            lightZ.value = z.toFixed(1);
+            updateLightFromGUI();
+        });
+
+        renderer.domElement.addEventListener('pointerup', (event) => {
+            if (!movingLightWithMouse) return;
+            movingLightWithMouse = false;
+            controls.enabled = true;
+            if (renderer.domElement.hasPointerCapture(event.pointerId)) {
+                renderer.domElement.releasePointerCapture(event.pointerId);
+            }
+        });
+
+        updateLightFromGUI();
+
+        function animate(t) {
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+        animate(0);
+
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+</script>
+</body>
+</html>

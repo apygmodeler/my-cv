@@ -1,0 +1,107 @@
+body {
+            margin: 0;
+            overflow: hidden;
+        }
+
+:root{
+            --ui-bg:#080808;
+            --ui-panel:#111111;
+            --ui-panel2:#181818;
+            --ui-line:#2a2a2a;
+            --ui-text:#f5f5f5;
+            --ui-muted:#969696;
+        }
+        #controlPanel{
+            position:fixed;
+            top:18px;
+            right:18px;
+            z-index:20;
+            width:260px;
+            padding:18px;
+            color:var(--ui-text);
+            background:rgba(12,12,12,.94);
+            border:1px solid #242424;
+            border-radius:20px;
+            box-shadow:0 20px 60px rgba(0,0,0,.45);
+            font-family:Inter,"Noto Sans Thai",system-ui,sans-serif;
+            backdrop-filter:blur(10px);
+            user-select:none;
+        }
+        #controlPanel h1{
+            margin:0;
+            font-size:18px;
+            letter-spacing:.04em;
+        }
+        #controlPanel .hint{
+            margin:5px 0 16px;
+            color:var(--ui-muted);
+            font-size:11px;
+            line-height:1.45;
+        }
+        #controlPanel .section{
+            padding-top:14px;
+            margin-top:14px;
+            border-top:1px solid var(--ui-line);
+        }
+        #controlPanel .section:first-of-type{
+            margin-top:0;
+        }
+        #controlPanel .sectionTitle{
+            margin:0 0 10px;
+            color:var(--ui-muted);
+            font-size:10px;
+            font-weight:700;
+            letter-spacing:.16em;
+            text-transform:uppercase;
+        }
+        #controlPanel .row{
+            margin:10px 0;
+        }
+        #controlPanel .labelRow{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:10px;
+            margin-bottom:6px;
+            font-size:12px;
+        }
+        #controlPanel .value{
+            min-width:44px;
+            text-align:right;
+            color:#ffffff;
+            font-variant-numeric:tabular-nums;
+        }
+        #controlPanel input[type="range"]{
+            width:100%;
+            accent-color:#ffffff;
+            cursor:pointer;
+        }
+#controlPanel button{
+            width:100%;
+            min-height:40px;
+            margin-top:8px;
+            color:var(--ui-text);
+            background:var(--ui-panel2);
+            border:1px solid #303030;
+            border-radius:12px;
+            font:inherit;
+            cursor:pointer;
+            transition:.18s ease;
+        }
+        #controlPanel button:hover{
+            border-color:#666;
+            transform:translateY(-1px);
+        }
+        #lightDot{
+            position:fixed;
+            left:18px;
+            bottom:18px;
+            z-index:20;
+            padding:9px 12px;
+            color:#ddd;
+            background:rgba(12,12,12,.78);
+            border:1px solid #2a2a2a;
+            border-radius:12px;
+            font:11px Inter,"Noto Sans Thai",system-ui,sans-serif;
+            pointer-events:none;
+        }

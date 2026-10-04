@@ -3,9 +3,7 @@
 
 <head>
     <meta charset="utf-8" />
-
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-
     <title>My 3D Portfolio</title>
 
     <style>
@@ -25,39 +23,35 @@
             position: fixed;
             top: 20px;
             left: 20px;
-
+            max-width: 320px;
             padding: 12px 16px;
-
             background: rgba(0, 0, 0, 0.65);
             color: white;
-
             border-radius: 10px;
-
             font-size: 14px;
-
+            line-height: 1.5;
             z-index: 10;
-
             user-select: none;
+        }
+
+        #infoTitle {
+            display: block;
+            font-size: 17px;
+            font-weight: bold;
+            margin-bottom: 2px;
         }
 
         #resetButton {
             position: fixed;
-
             bottom: 20px;
             left: 20px;
-
             padding: 10px 16px;
-
             border: none;
             border-radius: 8px;
-
             background: rgba(0, 0, 0, 0.7);
             color: white;
-
             cursor: pointer;
-
             font-size: 14px;
-
             z-index: 10;
         }
 
@@ -65,430 +59,286 @@
             background: rgba(50, 50, 50, 0.9);
         }
     </style>
+
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/lights/RectAreaLightUniformsLib.js"></script>
-
 </head>
-
 
 <body>
     <div id="info">
-        Click the front plate or top sign to zoom
+        <span id="infoTitle">My 3D Portfolio</span>
+        <span id="infoText">Click a board on the signpost (or the van itself) to zoom in</span>
     </div>
 
-    <button id="resetButton">
-        Reset View
-    </button>
-
+    <button id="resetButton">Reset View</button>
 
     <script>
+        const MODEL_URLS = [
+            'https://apygmodeler.github.io/my-cv/3dmodels/van.glb'
+        ];
+
+        const DEBUG_HITBOXES = false;
+
+        const LIGHT_GAIN = 3.0;
+
         const scene = new THREE.Scene();
-
         scene.background = new THREE.Color(0x202020);
-        const camera = new THREE.PerspectiveCamera(
-            60,
-            innerWidth / innerHeight,
-            0.1,
-            1000
-        );
-        const renderer = new THREE.WebGLRenderer({
-            antialias: true
-        });
-        renderer.setSize(
-            innerWidth,
-            innerHeight
-        );
-        renderer.setPixelRatio(
-            Math.min(devicePixelRatio, 2)
-        );
 
+        const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 1000);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(innerWidth, innerHeight);
+        renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
         renderer.outputEncoding = THREE.sRGBEncoding;
 
-        document.body.appendChild(
-            renderer.domElement
-        );
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.0;
+        document.body.appendChild(renderer.domElement);
 
-        const controls = new THREE.OrbitControls(
-            camera,
-            renderer.domElement
-        );
-
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.08;
-        controls.enableZoom = true;
-        controls.enableRotate = true;
         controls.enablePan = false;
         controls.minDistance = 1;
         controls.maxDistance = 30;
+        controls.maxPolarAngle = Math.PI / 2 - 0.02;
 
-        const startCameraPosition = new THREE.Vector3(
-            6,
-            4,
-            8
-        );
+        const startCameraPosition = new THREE.Vector3(11, 6, 12);
+        const startTarget = new THREE.Vector3(-1.5, 2.5, 3);
 
-        const startTarget = new THREE.Vector3(
-            0,
-            1,
-            0
-        );
-
-        camera.position.copy(
-            startCameraPosition
-        );
-
-        controls.target.copy(
-            startTarget
-        );
+        camera.position.copy(startCameraPosition);
+        controls.target.copy(startTarget);
+        controls.update();
 
         THREE.RectAreaLightUniformsLib.init();
 
-        const areaLight1 = new THREE.RectAreaLight(
-            0xffffff,
-            5,
-            5,
-            5
-        );
-        areaLight1.position.set(
-            4,
-            5,
-            4
-        );
-        areaLight1.lookAt(
-            0,
-            1,
-            0
-        );
-        scene.add(
-            areaLight1
-        );
+        function addBlenderAreaLight({ color, power, width, height, position, direction, up }) {
 
-        const areaLight2 = new THREE.RectAreaLight(
-            0xff88aa,
-            3,
-            4,
-            4
-        );
-        areaLight2.position.set(
-            -4,
-            3,
-            2
-        );
-        areaLight2.lookAt(
-            0,
-            1,
-            0
-        );
-        scene.add(
-            areaLight2
-        );
-        const ambientLight = new THREE.AmbientLight(
-            0xffffff,
-            0.5
-        );
-        scene.add(
-            ambientLight
-        );
+            const radiance = power / (4 * Math.PI * width * height);
+            const light = new THREE.RectAreaLight(color, radiance * LIGHT_GAIN, width, height);
+            light.position.copy(position);
+            light.up.copy(up);
+            light.lookAt(position.clone().add(direction.clone().multiplyScalar(10)));
+            scene.add(light);
+            return light;
+        }
 
-        let model = null;
+        addBlenderAreaLight({
+            color: new THREE.Color(1.0, 1.0, 1.0),
+            power: 3000,
+            width: 19.2414,
+            height: 19.2414,
+            position: new THREE.Vector3(0.0579, 16.2849, -1.7161),
+            direction: new THREE.Vector3(0, -1, 0),
+            up: new THREE.Vector3(0, 0, -1)
+        });
+
+        addBlenderAreaLight({
+            color: new THREE.Color(1.0, 0.489, 0.419),
+            power: 1500,
+            width: 4.621,
+            height: 7.043,
+            position: new THREE.Vector3(-3.4328, 10.4647, 3.8028),
+            direction: new THREE.Vector3(0.0960, -0.8097, -0.5790).normalize(),
+            up: new THREE.Vector3(0.0277, 0.5836, -0.8116).normalize()
+        });
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.1));
+
 
         const loader = new THREE.GLTFLoader();
-        loader.load(
-            'https://apygmodeler.github.io/my-cv/3dmodels/van.glb',
-            (gltf) => {
-                model = gltf.scene;
-                model.traverse((child) => {
-                    if (child.isMesh) {
-                        child.castShadow = true;
-                        child.receiveShadow = true;
-                    }
-                });
-                model.position.set(
-                    0,
-                    0,
-                    0
-                );
-                scene.add(model);
-                createHitboxes();
-            },
-            undefined,
-            (error) => {
-                console.error(
-                    'Error loading model:',
-                    error
-                );
-            }
-        );
 
-        const raycaster = new THREE.Raycaster();
-        const pointer = new THREE.Vector2();
+        function loadModel(index) {
+            if (index >= MODEL_URLS.length) {
+                console.error('Cannot load van.glb from any URL');
+                return;
+            }
+            loader.load(
+                MODEL_URLS[index],
+                (gltf) => {
+                    scene.add(gltf.scene);
+                },
+                undefined,
+                (error) => {
+                    console.warn('Failed to load', MODEL_URLS[index], error);
+                    loadModel(index + 1);
+                }
+            );
+        }
+        loadModel(0);
+
+        const SPOTS = {
+            name: {
+                title: 'My name',
+                text: 'The sign on top of the van',
+                center: new THREE.Vector3(1.95, 6.2, -0.9),
+                normal: new THREE.Vector3(1, 0, 0),
+                size: [5.4, 2.1]
+            },
+            id: {
+                title: 'My ID',
+                text: 'The front license plate',
+                center: new THREE.Vector3(0, 1.46, 4.58),
+                normal: new THREE.Vector3(0, 0, 1),
+                size: [3.5, 0.9]
+            },
+            portfolio: {
+                title: 'My Portfolio',
+                text: 'The dinosaur sign on the side of the van',
+                center: new THREE.Vector3(2.0, 3.6, -1.85),
+                normal: new THREE.Vector3(1, 0, 0),
+                size: [4.4, 2.2]
+            }
+        };
+
         const clickableObjects = [];
 
         const hitboxMaterial = new THREE.MeshBasicMaterial({
-
             color: 0xff0000,
-
             transparent: true,
-
-            opacity: 0,
-
+            opacity: DEBUG_HITBOXES ? 0.35 : 0,
             depthWrite: false
-
         });
 
-        function createHitboxes() {
-
-            const hitboxMaterial = new THREE.MeshBasicMaterial({
-                color: 0xff0000,
-                transparent: true,
-                opacity: 0.35,
-                depthWrite: false
-            });
-
-            const frontGeometry = new THREE.BoxGeometry(
-                2,
-                1,
-                1
-            );
-            const frontHitbox = new THREE.Mesh(
-                frontGeometry,
+        function addHitbox(name, spotKey, size, position) {
+            const box = new THREE.Mesh(
+                new THREE.BoxGeometry(size[0], size[1], size[2]),
                 hitboxMaterial
             );
-            frontHitbox.name = "FrontPlateHitbox";
-            frontHitbox.userData.zoomTarget = "front";
-            frontHitbox.position.set(
-                0,
-                1,
-                2
-            );
-            model.add(frontHitbox);
-            clickableObjects.push(
-                frontHitbox
-            );
-            const topGeometry = new THREE.BoxGeometry(
-                2,
-                1.5,
-                1
-            );
-            const topHitbox = new THREE.Mesh(
-                topGeometry,
-                hitboxMaterial
-            );
-            topHitbox.name = "TopSignHitbox";
-            topHitbox.userData.zoomTarget = "top";
-            topHitbox.position.set(
-                0,
-                3,
-                0
-            );
-            model.add(topHitbox);
-            clickableObjects.push(
-                topHitbox
-            );
-            console.log(
-                "Front Hitbox:",
-                frontHitbox
-            );
-            console.log(
-                "Top Hitbox:",
-                topHitbox
-            );
+            box.name = name;
+            box.userData.spot = spotKey;
+            box.position.set(position[0], position[1], position[2]);
+            scene.add(box);
+            clickableObjects.push(box);
         }
 
-        renderer.domElement.addEventListener(
-            'click',
-            onPick
-        );
+        addHitbox('TopSignHitbox', 'name', [4.2, 2.1, 5.4], [0, 6.2, -0.9]);
+        addHitbox('FrontPlateHitbox', 'id', [3.5, 0.8, 0.6], [0, 1.46, 4.75]);
+        addHitbox('SideDinoSignHitbox', 'portfolio', [0.6, 2.2, 4.4], [2.15, 3.6, -1.85]);
 
-        function onPick(event) {
-            const rect =
-                renderer.domElement.getBoundingClientRect();
-            const x =
-                event.clientX - rect.left;
-            const y =
-                event.clientY - rect.top;
-            pointer.x =
-                (x / rect.width) * 2 - 1;
-            pointer.y =
-                -(y / rect.height) * 2 + 1;
-            raycaster.setFromCamera(
-                pointer,
-                camera
-            );
-            const intersects =
-                raycaster.intersectObjects(
-                    clickableObjects,
-                    true
-                );
-            if (intersects.length === 0) {
-                console.log(
-                    "Nothing clicked"
-                );
-                return;
-            }
-            const clickedObject =
-                intersects[0].object;
-            console.log(
-                "Clicked:",
-                clickedObject.name
-            );
-            if (
-                clickedObject.userData.zoomTarget
-                === "front"
-            ) {
-                console.log(
-                    "Zooming to FRONT PLATE"
-                );
-                zoomToTarget(
-                    new THREE.Vector3(
-                        0,
-                        1.0,
-                        5
-                    )
-                );
-            }
+        addHitbox('SignBoard_MyName', 'name', [0.6, 0.8, 2.0], [-4.8, 4.39, 8.0]);
+        addHitbox('SignBoard_MyID', 'id', [0.6, 0.8, 2.0], [-4.8, 3.31, 8.3]);
+        addHitbox('SignBoard_MyPortfolio', 'portfolio', [0.6, 0.8, 2.0], [-4.8, 1.99, 8.17]);
 
-            if (
-                clickedObject.userData.zoomTarget
-                === "top"
-            ) {
-                console.log(
-                    "Zooming to TOP SIGN"
-                );
-                zoomToTarget(
-                    new THREE.Vector3(
-                        0,
-                        7,
-                        0
-                    )
-                );
-            }
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+
+        function pickSpot(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            pointer.x = (x / rect.width) * 2 - 1;
+            pointer.y = -(y / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(pointer, camera);
+            const hit = raycaster.intersectObjects(clickableObjects, false)[0];
+            return hit ? hit.object : null;
         }
 
-        let isZooming = false;
-        const targetCameraPosition =
-            new THREE.Vector3();
-        const targetControlsPosition =
-            new THREE.Vector3();
-        function zoomToTarget(
-            target
-        ) {
-            targetControlsPosition.copy(
-                target
-            );
-            const direction =
-                new THREE.Vector3();
-            direction.subVectors(
-                camera.position,
-                target
-            );
+        let downX = 0, downY = 0;
+        renderer.domElement.addEventListener('pointerdown', (e) => {
+            downX = e.clientX;
+            downY = e.clientY;
+        });
 
-            direction.normalize();
+        renderer.domElement.addEventListener('click', (e) => {
+            if (Math.hypot(e.clientX - downX, e.clientY - downY) > 5) return;
 
-            const zoomDistance = 3;
+            const hit = pickSpot(e);
+            if (!hit) return;
 
-            targetCameraPosition
-                .copy(target)
-                .add(
-                    direction.multiplyScalar(
-                        zoomDistance
-                    )
-                );
+            console.log('Clicked:', hit.name);
+            focusOnSpot(hit.userData.spot);
+        });
 
-            isZooming = true;
+        renderer.domElement.addEventListener('pointermove', (e) => {
+            if (e.buttons !== 0) return;
+            renderer.domElement.style.cursor = pickSpot(e) ? 'pointer' : 'default';
+        });
 
+        const tween = {
+            active: false,
+            startTime: 0,
+            duration: 1200, // ms
+            fromPos: new THREE.Vector3(),
+            toPos: new THREE.Vector3(),
+            fromTarget: new THREE.Vector3(),
+            toTarget: new THREE.Vector3()
+        };
+
+        function flyTo(position, target) {
+            tween.fromPos.copy(camera.position);
+            tween.toPos.copy(position);
+            tween.fromTarget.copy(controls.target);
+            tween.toTarget.copy(target);
+            tween.startTime = performance.now();
+            tween.active = true;
         }
 
-        document
-            .getElementById("resetButton")
-            .addEventListener(
-                "click",
-                resetCamera
+        function fitDistance(w, h) {
+            const t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+            const byHeight = (h / 2) / t;
+            const byWidth = (w / 2) / (t * camera.aspect);
+            return Math.max(byHeight, byWidth) * 1.15;
+        }
+
+        function focusOnSpot(key) {
+            const spot = SPOTS[key];
+            const distance = fitDistance(spot.size[0], spot.size[1]);
+            const camPos = spot.center.clone().add(
+                spot.normal.clone().normalize().multiplyScalar(distance)
             );
+            flyTo(camPos, spot.center);
+            setInfo(spot.title, spot.text);
+        }
+
+        function updateTween(now) {
+            if (!tween.active) return;
+
+            let k = (now - tween.startTime) / tween.duration;
+            if (k >= 1) {
+                k = 1;
+                tween.active = false;
+            }
+            const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+
+            camera.position.lerpVectors(tween.fromPos, tween.toPos, e);
+            controls.target.lerpVectors(tween.fromTarget, tween.toTarget, e);
+        }
+
+        controls.addEventListener('start', () => {
+            tween.active = false;
+        });
+
+        function setInfo(title, text) {
+            document.getElementById('infoTitle').textContent = title;
+            document.getElementById('infoText').textContent = text;
+        }
 
         function resetCamera() {
-
-            targetCameraPosition.copy(
-                startCameraPosition
-            );
-            targetControlsPosition.copy(
-                startTarget
-            );
-            isZooming = true;
+            flyTo(startCameraPosition, startTarget);
+            setInfo('My 3D Portfolio', 'Click a board on the signpost (or the van itself) to zoom in');
         }
 
-        function updateCamera() {
-            if (!isZooming) {
-                return;
-            }
+        document.getElementById('resetButton').addEventListener('click', resetCamera);
 
-            camera.position.lerp(
-                targetCameraPosition,
-                0.08
-            );
+        addEventListener('resize', () => {
+            camera.aspect = innerWidth / innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(innerWidth, innerHeight);
+            renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+        });
 
-            controls.target.lerp(
-                targetControlsPosition,
-                0.08
-            );
-
-            const distance =
-                camera.position.distanceTo(
-                    targetCameraPosition
-                );
-
-            if (distance < 0.01) {
-                camera.position.copy(
-                    targetCameraPosition
-                );
-
-                controls.target.copy(
-                    targetControlsPosition
-                );
-
-                isZooming = false;
-
-            }
-
-        }
-
-        window.addEventListener(
-            'resize',
-            function () {
-                camera.aspect =
-                    innerWidth /
-                    innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(
-                    innerWidth,
-                    innerHeight
-                );
-                renderer.setPixelRatio(
-                    Math.min(
-                        devicePixelRatio,
-                        2
-                    )
-                );
-            }
-        );
-
-        function animate(
-            time
-        ) {
-            requestAnimationFrame(
-                animate
-            );
-
-            updateCamera();
+        function animate(time) {
+            requestAnimationFrame(animate);
+            updateTween(performance.now());
             controls.update();
-            renderer.render(
-                scene,
-                camera
-            );
+            renderer.render(scene, camera);
         }
         animate();
     </script>
 </body>
+
 </html>

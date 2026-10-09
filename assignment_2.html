@@ -75,14 +75,17 @@
     <button id="resetButton">Reset View</button>
 
     <script>
-        const MODEL_URLS = [
-            'https://apygmodeler.github.io/my-cv/3dmodels/van.glb'
-        ];
+        const MODEL_URLS = ['https://apygmodeler.github.io/my-cv/3dmodels/van.glb'];
+        const CV_URL = 'https://apygmodeler.github.io/my-cv/'; 
 
         const DEBUG_HITBOXES = false;
 
         const LIGHT_GAIN = 3.0;
-
+        const OUTLINE_THICKNESS = 0.06;
+        const SIGN_OUTLINE_THICKNESS = 0.06;
+        const SMOKE_ENABLED = true;
+        const SMOKE_ORIGIN = new THREE.Vector3(-1.2, 1.3, -4.7);
+        
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x202020);
 
@@ -147,8 +150,272 @@
 
         scene.add(new THREE.AmbientLight(0xffffff, 0.1));
 
+        const uniforms = {
+            uTime: { value: 0.0 },
+            uDrive: { value: 1.0 },
+            uLightDir1: { value: new THREE.Vector3(0.25, 1.0, 0.3).normalize() },
+            uLightDir2: { value: new THREE.Vector3(-0.38, 0.82, 0.42).normalize() },
+            uLightColor2: { value: new THREE.Vector3(1.0, 0.4, 0.4) }
+        };
+
+        const drive = `
+            uniform float uTime;
+            uniform float uDrive;
+
+            vec3 drive(vec3 w) {
+                float base = 0.55;
+                float t = uTime * 7.0;
+                float s = sin(t);
+
+                float squash = 1.0 + 0.03 * s * uDrive;
+                w.y = base + (w.y - base) * squash;
+                w.xz *= 1.0 / sqrt(squash);
+
+                w.y += abs(sin(t * 0.5)) * 0.05 * uDrive;
+                w.y += w.z * 0.012 * sin(t * 0.35) * uDrive;
+                return w;
+            }
+        `;
+
+        const vertexShader = `
+            ${drive}
+
+            varying vec2 vUv;
+            varying vec3 vNormal;
+
+            void main() {
+                vUv = uv;
+                vNormal = normalize(mat3(modelMatrix) * normal);
+
+                vec3 worldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+                worldPos = drive(worldPos);
+
+                gl_Position = projectionMatrix * viewMatrix * vec4(worldPos, 1.0);
+            }
+        `;
+
+        const fragmentShader = `
+            uniform sampler2D uMap;
+            uniform float uHasMap;
+            uniform vec3 uColor;
+            uniform vec3 uEmissive;
+
+            uniform vec3 uLightDir1;
+            uniform vec3 uLightDir2;
+            uniform vec3 uLightColor2;
+
+            varying vec2 vUv;
+            varying vec3 vNormal;
+
+            float toon(float d) {
+                return min(floor(d * 3.0), 2.0) / 2.0;
+            }
+
+            void main() {
+                vec3 color = uColor;
+                if (uHasMap > 0.5) {
+                    color *= texture2D(uMap, vUv).rgb;
+                }
+
+                vec3 N = normalize(vNormal);
+                if (!gl_FrontFacing) N = -N;
+
+                float d1 = max(dot(N, normalize(uLightDir1)), 0.0);
+                float d2 = max(dot(N, normalize(uLightDir2)), 0.0);
+
+                float ambient = 0.4;
+                vec3 light = vec3(ambient)
+                        + vec3(0.55) * toon(d1)
+                        + uLightColor2 * 0.3 * toon(d2);
+
+                color = color * light + uEmissive;
+                gl_FragColor = vec4(color, 1.0);
+            }
+        `;
+
+        const outlineVertexShader = `
+            ${drive}
+
+            uniform float uThickness;
+
+            void main() {
+                vec3 pos = position + normal * uThickness;
+
+                vec3 worldPos = (modelMatrix * vec4(pos, 1.0)).xyz;
+                worldPos = drive(worldPos);
+
+                gl_Position = projectionMatrix * viewMatrix * vec4(worldPos, 1.0);
+            }
+        `;
+
+        const outlineFragmentShader = `
+            void main() {
+                gl_FragColor = vec4(0.08, 0.08, 0.08, 1.0);
+            }
+        `;
+
+        const outlineMaterial = new THREE.ShaderMaterial({
+            vertexShader: outlineVertexShader,
+            fragmentShader: outlineFragmentShader,
+            uniforms: {
+                uTime: uniforms.uTime,
+                uDrive: uniforms.uDrive,
+                uThickness: { value: OUTLINE_THICKNESS }
+            },
+            side: THREE.BackSide
+        });
+
+        const signOutlineMaterial = new THREE.ShaderMaterial({
+            vertexShader: outlineVertexShader,
+            fragmentShader: outlineFragmentShader,
+            uniforms: {
+                uTime: uniforms.uTime,
+                uDrive: { value: 0.0 },
+                uThickness: { value: SIGN_OUTLINE_THICKNESS }
+            },
+            side: THREE.BackSide
+        });
+
+        function makeToonMaterial(original) {
+            const color = original.color
+                ? original.color.clone().convertLinearToSRGB()
+                : new THREE.Color(1, 1, 1);
+            const emissive = original.emissive
+                ? original.emissive.clone().convertLinearToSRGB()
+                : new THREE.Color(0, 0, 0);
+
+            return new THREE.ShaderMaterial({
+                vertexShader,
+                fragmentShader,
+                uniforms: {
+                    ...uniforms,
+                    uMap: { value: original.map || null },
+                    uHasMap: { value: original.map ? 1.0 : 0.0 },
+                    uColor: { value: new THREE.Vector3(color.r, color.g, color.b) },
+                    uEmissive: { value: new THREE.Vector3(emissive.r, emissive.g, emissive.b) }
+                },
+                side: original.side
+            });
+        }
+
+        const smokeUniforms = {
+            uTime: uniforms.uTime,
+            uOrigin: { value: SMOKE_ORIGIN },
+            uScale: { value: 1.0 }
+        };
+
+        function updateSmokeScale() {
+            smokeUniforms.uScale.value =
+                (innerHeight * renderer.getPixelRatio()) /
+                (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+        }
+
+        function createSmoke() {
+            const COUNT = 70;
+            const seeds = new Float32Array(COUNT);
+            const positions = new Float32Array(COUNT * 3);
+            for (let i = 0; i < COUNT; i++) seeds[i] = i / COUNT;
+
+            const geo = new THREE.BufferGeometry();
+            geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geo.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1));
+
+            const mat = new THREE.ShaderMaterial({
+                uniforms: smokeUniforms,
+                transparent: true,
+                depthWrite: false,
+                vertexShader: `
+                    attribute float aSeed;
+                    uniform float uTime;
+                    uniform vec3 uOrigin;
+                    uniform float uScale;
+                    varying float vAlpha;
+
+                    void main() {
+                        float life = fract(uTime * 0.35 + aSeed);
+
+                        vec3 p = uOrigin;
+                        p.z -= life * 2.8;
+                        p.y += life * 1.8;
+                        p.x += sin(aSeed * 40.0 + life * 6.0) * 0.4 * life;
+
+                        vAlpha = (1.0 - life) * smoothstep(0.0, 0.08, life) * 0.55;
+
+                        vec4 mv = viewMatrix * vec4(p, 1.0);
+                        float worldSize = 0.35 + life * 1.1;
+                        gl_PointSize = worldSize * uScale / -mv.z;
+                        gl_Position = projectionMatrix * mv;
+                    }
+                `,
+                fragmentShader: `
+                    varying float vAlpha;
+
+                    void main() {
+                        float d = length(gl_PointCoord - vec2(0.5));
+                        float soft = 1.0 - smoothstep(0.1, 0.5, d);
+                        gl_FragColor = vec4(vec3(0.78), soft * vAlpha);
+                    }
+                `
+            });
+
+            const points = new THREE.Points(geo, mat);
+            points.frustumCulled = false;
+            scene.add(points);
+        }
+
+        updateSmokeScale();
+        if (SMOKE_ENABLED) createSmoke();
 
         const loader = new THREE.GLTFLoader();
+        function applyShadersToVan(root) {
+            root.updateMatrixWorld(true);
+            const box = new THREE.Box3();
+            const size = new THREE.Vector3();
+            const center = new THREE.Vector3();
+            const outlineJobs = [];
+            const signOutlineJobs = [];
+
+            root.children.forEach((node) => {
+                box.setFromObject(node);
+                box.getSize(size);
+                box.getCenter(center);
+
+                const isGround = size.x > 50;
+                const isSignpost = center.x < -4;
+                if (isGround) return;
+
+                if (isSignpost) {
+                    node.traverse((child) => {
+                        if (child.isMesh) signOutlineJobs.push(child);
+                    });
+                    return;
+                }
+
+                const isBody = size.y > 4 && size.z > 6;
+
+                node.traverse((child) => {
+                    if (!child.isMesh) return;
+                    child.material = makeToonMaterial(child.material);
+                    if (isBody) outlineJobs.push(child);
+                });
+            });
+
+            function addOutline(mesh, material) {
+                const outline = new THREE.Mesh(mesh.geometry, material);
+                outline.position.copy(mesh.position);
+                outline.quaternion.copy(mesh.quaternion);
+                outline.scale.copy(mesh.scale);
+                mesh.parent.add(outline);
+            }
+
+            outlineJobs.forEach((mesh) => addOutline(mesh, outlineMaterial));
+
+            let signParts = signOutlineJobs.filter(
+                (m) => m.material && m.material.name === 'Material.010'
+            );
+            if (signParts.length === 0) signParts = signOutlineJobs;
+            signParts.forEach((mesh) => addOutline(mesh, signOutlineMaterial));
+        }
 
         function loadModel(index) {
             if (index >= MODEL_URLS.length) {
@@ -158,6 +425,7 @@
             loader.load(
                 MODEL_URLS[index],
                 (gltf) => {
+                    applyShadersToVan(gltf.scene);
                     scene.add(gltf.scene);
                 },
                 undefined,
@@ -172,21 +440,21 @@
         const SPOTS = {
             name: {
                 title: 'My name',
-                text: 'My name',
+                text: 'Attapinya Roengsup',
                 center: new THREE.Vector3(1.95, 6.2, -0.9),
                 normal: new THREE.Vector3(1, 0, 0),
                 size: [5.4, 2.1]
             },
             id: {
                 title: 'My ID',
-                text: 'My ID',
+                text: '6721651939',
                 center: new THREE.Vector3(0, 1.46, 4.58),
                 normal: new THREE.Vector3(0, 0, 1),
                 size: [3.5, 0.9]
             },
             portfolio: {
                 title: 'My Portfolio',
-                text: 'My Portfolio',
+                text: 'Click on dinosaur pic to enter my CV',
                 center: new THREE.Vector3(2.0, 3.6, -1.85),
                 normal: new THREE.Vector3(1, 0, 0),
                 size: [4.4, 2.2]
@@ -212,11 +480,12 @@
             box.position.set(position[0], position[1], position[2]);
             scene.add(box);
             clickableObjects.push(box);
+            return box;
         }
 
         addHitbox('TopSignHitbox', 'name', [4.2, 2.1, 5.4], [0, 6.2, -0.9]);
         addHitbox('FrontPlateHitbox', 'id', [3.5, 0.8, 0.6], [0, 1.46, 4.75]);
-        addHitbox('SideDinoSignHitbox', 'portfolio', [0.6, 2.2, 4.4], [2.15, 3.6, -1.85]);
+        addHitbox('SideDinoSignHitbox', 'portfolio', [0.6, 2.2, 4.4], [2.15, 3.6, -1.85]).userData.link = true;;
 
         addHitbox('SignBoard_MyName', 'name', [0.6, 0.8, 2.0], [-4.8, 4.39, 8.0]);
         addHitbox('SignBoard_MyID', 'id', [0.6, 0.8, 2.0], [-4.8, 3.31, 8.3]);
@@ -250,6 +519,16 @@
             if (!hit) return;
 
             console.log('Clicked:', hit.name);
+
+            if (hit.userData.link) {
+                if (focusedSpot === 'portfolio' && !tween.active) {
+                    window.open(CV_URL, '_blank', 'noopener');
+                } else {
+                    focusOnSpot('portfolio');
+                }
+                return;
+            }
+
             focusOnSpot(hit.userData.spot);
         });
 
@@ -261,7 +540,7 @@
         const tween = {
             active: false,
             startTime: 0,
-            duration: 1200, // ms
+            duration: 1200,
             fromPos: new THREE.Vector3(),
             toPos: new THREE.Vector3(),
             fromTarget: new THREE.Vector3(),
@@ -283,6 +562,9 @@
             const byWidth = (w / 2) / (t * camera.aspect);
             return Math.max(byHeight, byWidth) * 1.15;
         }
+        
+        let driveTarget = 1.0;
+        let focusedSpot = null;
 
         function focusOnSpot(key) {
             const spot = SPOTS[key];
@@ -291,6 +573,8 @@
                 spot.normal.clone().normalize().multiplyScalar(distance)
             );
             flyTo(camPos, spot.center);
+            driveTarget = 0.0;
+            focusedSpot = key;
             setInfo(spot.title, spot.text);
         }
 
@@ -319,6 +603,8 @@
 
         function resetCamera() {
             flyTo(startCameraPosition, startTarget);
+            driveTarget = 1.0;
+            focusedSpot = null;
             setInfo('My 3D Portfolio', 'Click a board on the signpost (or the van itself) to zoom in');
         }
 
@@ -329,15 +615,20 @@
             camera.updateProjectionMatrix();
             renderer.setSize(innerWidth, innerHeight);
             renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+            updateSmokeScale();
         });
 
         function animate(time) {
             requestAnimationFrame(animate);
+
+            uniforms.uTime.value = time * 0.001;
+            uniforms.uDrive.value += (driveTarget - uniforms.uDrive.value) * 0.05;
+
             updateTween(performance.now());
             controls.update();
             renderer.render(scene, camera);
         }
-        animate();
+        requestAnimationFrame(animate);
     </script>
 </body>
 
